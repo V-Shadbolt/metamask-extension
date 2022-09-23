@@ -4,6 +4,7 @@ import thunk from 'redux-thunk';
 import { useLocation } from 'react-router-dom';
 import { SEND_STAGES, startNewDraftTransaction } from '../../ducks/send';
 import { ensInitialState } from '../../ducks/ens';
+import { unsInitialState } from '../../ducks/uns';
 import { renderWithProvider } from '../../../test/jest';
 import { CHAIN_IDS } from '../../../shared/constants/network';
 import { GAS_ESTIMATE_TYPES } from '../../../shared/constants/gas';
@@ -54,6 +55,7 @@ jest.mock('ethers', () => {
 const baseStore = {
   send: INITIAL_SEND_STATE_FOR_EXISTING_DRAFT,
   ENS: ensInitialState,
+  UNS: unsInitialState,
   gas: {
     customData: { limit: null, price: null },
   },
@@ -164,11 +166,11 @@ describe('Send Page', () => {
       expect(getByText('Send to')).toBeTruthy();
     });
 
-    it('should render the EnsInput field', () => {
+    it('should render the DomainInput field', () => {
       const store = configureMockStore(middleware)(baseStore);
       const { getByPlaceholderText } = renderWithProvider(<Send />, store);
       expect(
-        getByPlaceholderText('Search, public address (0x), or ENS'),
+        getByPlaceholderText('Search, public address (0x), ENS, or UNS'),
       ).toBeTruthy();
     });
 
@@ -191,7 +193,7 @@ describe('Send Page', () => {
       // Ensure that the send flow renders on the add recipient screen when
       // there is no draft transaction.
       expect(
-        getByPlaceholderText('Search, public address (0x), or ENS'),
+        getByPlaceholderText('Search, public address (0x), ENS, or UNS'),
       ).toBeTruthy();
       // Ensure we start a new draft transaction when its missing.
       expect(startNewDraftTransaction).toHaveBeenCalledTimes(1);
@@ -208,11 +210,11 @@ describe('Send Page', () => {
       expect(getByText('Send')).toBeTruthy();
     });
 
-    it('should render the EnsInput field', () => {
+    it('should render the DomainInput field', () => {
       const store = configureMockStore(middleware)(baseStore);
       const { getByPlaceholderText } = renderWithProvider(<Send />, store);
       expect(
-        getByPlaceholderText('Search, public address (0x), or ENS'),
+        getByPlaceholderText('Search, public address (0x), ENS, or UNS'),
       ).toBeTruthy();
     });
 

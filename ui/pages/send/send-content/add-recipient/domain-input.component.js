@@ -3,16 +3,24 @@ import PropTypes from 'prop-types';
 import classnames from 'classnames';
 
 import { addHexPrefix } from '../../../../../app/scripts/lib/util';
-import { isValidDomainName } from '../../../../helpers/utils/util';
+import {
+  isValidENSDomainName,
+  isValidUnstoppableDomainName,
+} from '../../../../helpers/utils/util';
 import {
   isBurnAddress,
   isValidHexAddress,
 } from '../../../../../shared/modules/hexstring-utils';
 
-export default class EnsInput extends Component {
+export default class DomainInput extends Component {
   static contextTypes = {
     t: PropTypes.func,
     metricsEvent: PropTypes.func,
+  };
+
+  // temporary object to store Unstoppable Tlds
+  udRequirements = {
+    tlds: [],
   };
 
   static propTypes = {
@@ -27,12 +35,16 @@ export default class EnsInput extends Component {
     onChange: PropTypes.func.isRequired,
     onReset: PropTypes.func.isRequired,
     lookupEnsName: PropTypes.func.isRequired,
+    prepareResolutionCall: PropTypes.func.isRequired,
     initializeEnsSlice: PropTypes.func.isRequired,
+    initializeUnsSlice: PropTypes.func.isRequired,
+    resetUnsResolution: PropTypes.func.isRequired,
     resetEnsResolution: PropTypes.func.isRequired,
   };
 
   componentDidMount() {
     this.props.initializeEnsSlice();
+    this.props.initializeUnsSlice();
   }
 
   onPaste = (event) => {
@@ -50,13 +62,15 @@ export default class EnsInput extends Component {
     }
   };
 
-  onChange = ({ target: { value } }) => {
+  onChange = async ({ target: { value } }) => {
     const {
       onValidAddressTyped,
       internalSearch,
       onChange,
       lookupEnsName,
       resetEnsResolution,
+      resetUnsResolution,
+      prepareResolutionCall,
     } = this.props;
     const input = value.trim();
 
@@ -64,11 +78,16 @@ export default class EnsInput extends Component {
     if (internalSearch) {
       return null;
     }
-    // Empty ENS state if input is empty
-    // maybe scan ENS
-    if (isValidDomainName(input)) {
+    // check if user input is a Valid Unstoppable Domain
+    // if valid, calls prepareResolutionCall and resolves the Unstoppable Domain
+    if (await isValidUnstoppableDomainName(input)) {
+      resetEnsResolution();
+      prepareResolutionCall(input);
+    } else if (isValidENSDomainName(input)) {
+      resetUnsResolution();
       lookupEnsName(input);
     } else {
+      resetUnsResolution();
       resetEnsResolution();
       if (
         onValidAddressTyped &&
@@ -89,16 +108,16 @@ export default class EnsInput extends Component {
     const hasSelectedAddress = Boolean(selectedAddress);
 
     return (
-      <div className={classnames('ens-input', className)}>
+      <div className={classnames('domain-input', className)}>
         <div
-          className={classnames('ens-input__wrapper', {
-            'ens-input__wrapper__status-icon--error': false,
-            'ens-input__wrapper__status-icon--valid': false,
-            'ens-input__wrapper--valid': hasSelectedAddress,
+          className={classnames('domain-input__wrapper', {
+            'domain-input__wrapper__status-icon--error': false,
+            'domain-input__wrapper__status-icon--valid': false,
+            'domain-input__wrapper--valid': hasSelectedAddress,
           })}
         >
           <i
-            className={classnames('ens-input__wrapper__status-icon', 'fa', {
+            className={classnames('domain-input__wrapper__status-icon', 'fa', {
               'fa-check-circle': hasSelectedAddress,
               'fa-search': !hasSelectedAddress,
             })}
@@ -110,19 +129,19 @@ export default class EnsInput extends Component {
           />
           {hasSelectedAddress ? (
             <>
-              <div className="ens-input__wrapper__input ens-input__wrapper__input--selected">
-                <div className="ens-input__selected-input__title">
+              <div className="domain-input__wrapper__input domain-input__wrapper__input--selected">
+                <div className="domain-input__selected-input__title">
                   {selectedName || selectedAddress}
                 </div>
                 {selectedName !== selectedAddress && (
-                  <div className="ens-input__selected-input__subtitle">
+                  <div className="domain-input__selected-input__subtitle">
                     {selectedAddress}
                   </div>
                 )}
               </div>
               <button
                 onClick={this.props.onReset}
-                className="ens-input__wrapper__action-icon-button"
+                className="domain-input__wrapper__action-icon-button"
               >
                 <i
                   className="fa fa-times"
@@ -136,7 +155,7 @@ export default class EnsInput extends Component {
           ) : (
             <>
               <input
-                className="ens-input__wrapper__input"
+                className="domain-input__wrapper__input"
                 type="text"
                 dir="auto"
                 placeholder={t('recipientAddressPlaceholder')}
@@ -145,10 +164,10 @@ export default class EnsInput extends Component {
                 spellCheck="false"
                 value={selectedAddress || userInput}
                 autoFocus
-                data-testid="ens-input"
+                data-testid="domain-input"
               />
               <button
-                className="ens-input__wrapper__action-icon-button"
+                className="domain-input__wrapper__action-icon-button"
                 onClick={() => {
                   if (userInput) {
                     this.props.onReset();

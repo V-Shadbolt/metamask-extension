@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import BigNumber from 'bignumber.js';
+import { udTlds } from '@unstoppabledomains/tldsresolverkeys';
 import { addHexPrefix } from 'ethereumjs-util';
 import { debounce } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
@@ -19,6 +20,9 @@ import {
   KNOWN_RECIPIENT_ADDRESS_WARNING,
   NEGATIVE_ETH_ERROR,
   RECIPIENT_TYPES,
+  UNS_CURRENCY_SPEC_ERROR,
+  UNS_CURRENCY_ERROR,
+  UNS_UNKNOWN_ERROR,
 } from '../../pages/send/send.constants';
 
 import {
@@ -74,7 +78,7 @@ import {
   checkExistingAddresses,
   isDefaultMetaMaskChain,
   isOriginContractAddress,
-  isValidDomainName,
+  isValidENSDomainName,
 } from '../../helpers/utils/util';
 import {
   getGasEstimateType,
@@ -83,6 +87,7 @@ import {
 } from '../metamask/metamask';
 
 import { resetEnsResolution } from '../ens';
+import { swapUdOnTokenChange, resetUnsResolution, unsLookup } from '../uns';
 import {
   isBurnAddress,
   isValidHexAddress,
@@ -115,6 +120,7 @@ import {
   generateTransactionParams,
   getRoundedGasPrice,
 } from './helpers';
+
 // typedef import statements
 /**
  * @typedef {(
@@ -957,7 +963,6 @@ const slice = createSlice({
       draftTransaction.asset.type = asset.type;
       draftTransaction.asset.balance = asset.balance;
       draftTransaction.asset.error = asset.error;
-
       if (
         draftTransaction.asset.type === ASSET_TYPES.TOKEN ||
         draftTransaction.asset.type === ASSET_TYPES.COLLECTIBLE
@@ -1357,13 +1362,23 @@ const slice = createSlice({
             tokenAddressList,
             isProbablyAnAssetContract,
           } = action.payload;
-
+          // adds UD checks for Error Handling
+          let validUDDomain = false;
+          udTlds.forEach((tld) => {
+            if (state.recipientInput.toLowerCase().endsWith(`.${tld}`)) {
+              validUDDomain = true;
+            }
+          });
+          let isValidDomain = true;
+          if (!validUDDomain && !isValidENSDomainName(state.recipientInput)) {
+            isValidDomain = false;
+          }
           if (
             isBurnAddress(state.recipientInput) ||
             (!isValidHexAddress(state.recipientInput, {
               mixedCaseUseChecksum: true,
             }) &&
-              !isValidDomainName(state.recipientInput))
+              !isValidDomain)
           ) {
             draftTransaction.recipient.error = isDefaultMetaMaskChain(chainId)
               ? INVALID_RECIPIENT_ADDRESS_ERROR
@@ -1911,7 +1926,6 @@ export function updateRecipientUserInput(userInput) {
         }
       }
     }
-
     return new Promise((resolve) => {
       debouncedValidateRecipientUserInput(
         dispatch,
@@ -2014,6 +2028,58 @@ export function updateSendAsset(
           } with symbol ${state.metamask.provider?.ticker ?? ETH}`,
         ),
       );
+      /**
+       * Changes the Crypto Address associated with an Unstoppable Domain for Native Tokens
+       * checks to see if an Unstoppable Domain was resolved in the previous screen
+       * if it was, it runs swapUdOnTokenChange to get the address for the swapped currency/token
+       * updates error messaging if necessary
+       * dispatches the new resolved address to the transaction state
+       */
+      if (
+        state.UNS?.resolution ===
+          state.send.draftTransactions[state.send.currentTransactionUUID]
+            .recipient.address &&
+        state.UNS.domainName
+      ) {
+        let unsError = null;
+        const resolution = await swapUdOnTokenChange(
+          state.UNS.domainName,
+          state.metamask.provider?.ticker ?? 'ETH',
+        );
+        if (resolution.error) {
+          if (
+            resolution.error === 'UnspecifiedCurrency' ||
+            resolution.error === 'RecordNotFound'
+          ) {
+            unsError = UNS_CURRENCY_SPEC_ERROR;
+          } else if (resolution.error === 'UnsupportedCurrency') {
+            unsError = UNS_CURRENCY_ERROR;
+          } else {
+            unsError = UNS_UNKNOWN_ERROR;
+          }
+          await dispatch(
+            actions.updateAsset({
+              asset: {
+                type,
+                details: null,
+                balance: account.balance,
+                error: unsError,
+              },
+              initialAssetSet,
+            }),
+          );
+          throw new Error('No address associated with this token');
+        } else {
+          dispatch(unsLookup(resolution));
+          await dispatch(
+            updateRecipient({
+              address: resolution.address,
+              nickname: resolution.unsName,
+            }),
+          );
+        }
+      }
+
       await dispatch(
         actions.updateAsset({
           asset: {
@@ -2102,7 +2168,6 @@ export function updateSendAsset(
               dispatch(displayWarning(err.message));
             }
           }
-
           if (isCurrentOwner) {
             asset.error = null;
             asset.balance = '0x1';
@@ -2115,6 +2180,46 @@ export function updateSendAsset(
             addHistoryEntry(
               `sendFlow - user set asset to NFT with tokenId ${details.tokenId} and address ${details.address}`,
             ),
+          );
+        }
+      }
+      /**
+       *  Changes the Crypto Address associated with an Unstoppable Domain for Non Native Tokens
+       * checks to see if an Unstoppable Domain was resolved in the previous screen
+       * if it was, it runs swapUdOnTokenChange to get the address for the swapped currency/token
+       * updates error messaging if necessary
+       * dispatches the new resolved address to the transaction state
+       */
+      if (
+        state.UNS?.resolution ===
+          state.send.draftTransactions[state.send.currentTransactionUUID]
+            .recipient.address &&
+        state.UNS.domainName
+      ) {
+        const resolution = await swapUdOnTokenChange(
+          state.UNS.domainName,
+          asset,
+        );
+        if (resolution.error) {
+          if (
+            resolution.error === 'UnspecifiedCurrency' ||
+            resolution.error === 'RecordNotFound'
+          ) {
+            asset.error = UNS_CURRENCY_SPEC_ERROR;
+          } else if (resolution.error === 'UnsupportedCurrency') {
+            asset.error = UNS_CURRENCY_ERROR;
+          } else {
+            asset.error = UNS_UNKNOWN_ERROR;
+          }
+          await dispatch(actions.updateAsset({ asset, initialAssetSet }));
+          throw new Error('No address associated with this token');
+        } else {
+          dispatch(unsLookup(resolution));
+          await dispatch(
+            updateRecipient({
+              address: resolution.address,
+              nickname: resolution.unsName,
+            }),
           );
         }
       }
@@ -2200,6 +2305,7 @@ export function resetRecipientInput() {
     await dispatch(updateRecipientUserInput(''));
     await dispatch(updateRecipient({ address: '', nickname: '' }));
     await dispatch(resetEnsResolution());
+    await dispatch(resetUnsResolution());
     await dispatch(validateRecipientUserInput({ chainId }));
   };
 }

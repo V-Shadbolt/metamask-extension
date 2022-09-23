@@ -1785,7 +1785,7 @@
     "message": "IPFS Gateway"
   },
   "ipfsGatewayDescription": {
-    "message": "Enter the URL of the IPFS CID gateway to use for ENS content resolution."
+    "message": "Enter the URL of the IPFS CID gateway to use for ENS or UNS content resolution."
   },
   "jazzAndBlockies": {
     "message": "Jazzicons and Blockies are two different styles of unique icons that help you identify an account at a glance."
@@ -2780,7 +2780,7 @@
     "message": "Recents"
   },
   "recipientAddressPlaceholder": {
-    "message": "Search, public address (0x), or ENS"
+    "message": "Search, public address (0x), ENS, or UNS"
   },
   "recommendedGasLabel": {
     "message": "Recommended"
@@ -4192,6 +4192,21 @@
   "unrecognizedProtocol": {
     "message": "$1 (Unrecognized protocol)",
     "description": "Shown when the protocol is unknown by the extension. $1 is the protocol code."
+  },
+  "unsCommonError": {
+    "message": "No address has been set for this Unstoppable Domain."
+  },
+  "unsConfusingError": {
+    "message": "We have detected a confusable character in the Unstoppable Domain. Check the domain name to avoid a potential scam."
+  },
+  "unsCurrencyError": {
+    "message": "Unstoppable Domains does not support this currency. Try sending a different one or use the owners address instead."
+  },
+  "unsCurrencySpecError": {
+    "message": "The entered Unstoppable Domain does not have a crypto address for the selected currency. Let the owner know to add one!"
+  },
+  "unsUnknownError": {
+    "message": "There was an error resolving the entered Unstoppable Domain. Please use the owners address instead."
   },
   "unsendableAsset": {
     "message": "Sending collectible (ERC-721) tokens is not currently supported",

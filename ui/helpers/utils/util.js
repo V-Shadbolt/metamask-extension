@@ -1,11 +1,11 @@
-import punycode from 'punycode/punycode';
 import abi from 'human-standard-token-abi';
 import BigNumber from 'bignumber.js';
+import Resolution from '@unstoppabledomains/resolution';
 import * as ethUtil from 'ethereumjs-util';
 import { DateTime } from 'luxon';
 import { getFormattedIpfsUrl } from '@metamask/controllers/dist/util';
 import slip44 from '@metamask/slip44';
-import { CHAIN_IDS } from '../../../shared/constants/network';
+import { CHAIN_IDS, infuraProjectId } from '../../../shared/constants/network';
 import { toChecksumHexAddress } from '../../../shared/modules/hexstring-utils';
 import {
   TRUNCATED_ADDRESS_START_CHARS,
@@ -87,17 +87,49 @@ export function addressSummary(
     : '...';
 }
 
-export function isValidDomainName(address) {
-  const match = punycode
-    .toASCII(address)
-    .toLowerCase()
-    // Checks that the domain consists of at least one valid domain pieces separated by periods, followed by a tld
-    // Each piece of domain name has only the characters a-z, 0-9, and a hyphen (but not at the start or end of chunk)
-    // A chunk has minimum length of 1, but minimum tld is set to 2 for now (no 1-character tlds exist yet)
-    .match(
-      /^(?:[a-z0-9](?:[-a-z0-9]*[a-z0-9])?\.)+[a-z0-9][-a-z0-9]*[a-z0-9]$/u,
-    );
-  return match !== null;
+export function isValidENSDomainName(address) {
+  let result = false;
+  const tlds = ['.test', '.eth'];
+  tlds.forEach((tld) => {
+    if (address.toLowerCase().endsWith(tld)) {
+      result = true;
+    }
+  });
+  return result;
+}
+/**
+ * Determines whether or not user input is an Unstoppable Domain Name
+ * Only checks if the user input has a . and is longer than 1
+ * Sets the Provider URLS to the MetaMask defaults
+ * checks if the domain name is a supported domain name
+ * returns true or false
+ *
+ * @param {string} domainInput - inputted Unstoppable Domain Name
+ */
+export async function isValidUnstoppableDomainName(domainInput) {
+  if (domainInput.length > 1 && domainInput.includes('.')) {
+    const ethereumProviderUrl = `https://mainnet.infura.io/v3/${infuraProjectId}`;
+    const polygonProviderUrl = `https://polygon-mainnet.infura.io/v3/${infuraProjectId}`;
+    const udResolutionInstance = new Resolution({
+      sourceConfig: {
+        uns: {
+          locations: {
+            Layer1: {
+              url: ethereumProviderUrl,
+              network: 'mainnet',
+            },
+            Layer2: {
+              url: polygonProviderUrl,
+              network: 'polygon-mainnet',
+            },
+          },
+        },
+      },
+    });
+    const isValidUD = await udResolutionInstance.isSupportedDomain(domainInput);
+    return isValidUD;
+  }
+  return false;
 }
 
 export function isOriginContractAddress(to, sendTokenAddress) {

@@ -4,8 +4,11 @@ import { debounce } from 'lodash';
 import Identicon from '../../../../components/ui/identicon';
 import TextField from '../../../../components/ui/text-field';
 import { CONTACT_LIST_ROUTE } from '../../../../helpers/constants/routes';
-import { isValidDomainName } from '../../../../helpers/utils/util';
-import EnsInput from '../../../send/send-content/add-recipient/ens-input';
+import {
+  isValidENSDomainName,
+  isValidUnstoppableDomainName,
+} from '../../../../helpers/utils/util';
+import DomainInput from '../../../send/send-content/add-recipient/domain-input';
 import PageContainerFooter from '../../../../components/ui/page-container/page-container-footer';
 import {
   isBurnAddress,
@@ -28,6 +31,9 @@ export default class AddContact extends PureComponent {
     ensResolution: PropTypes.string,
     ensError: PropTypes.string,
     resetEnsResolution: PropTypes.func,
+    unsResolution: PropTypes.string,
+    unsError: PropTypes.string,
+    resetUnsResolution: PropTypes.func,
   };
 
   state = {
@@ -46,9 +52,11 @@ export default class AddContact extends PureComponent {
     if (nextProps.qrCodeData) {
       if (nextProps.qrCodeData.type === 'address') {
         const { ensResolution } = this.props;
+        const { unsResolution } = this.props;
         const scannedAddress =
           nextProps.qrCodeData.values.address.toLowerCase();
-        const currentAddress = ensResolution || this.state.ethAddress;
+        const currentAddress =
+          ensResolution || unsResolution || this.state.ethAddress;
         if (currentAddress.toLowerCase() !== scannedAddress) {
           this.setState({ input: scannedAddress });
           this.validate(scannedAddress);
@@ -63,9 +71,10 @@ export default class AddContact extends PureComponent {
     const valid =
       !isBurnAddress(address) &&
       isValidHexAddress(address, { mixedCaseUseChecksum: true });
-    const validEnsAddress = isValidDomainName(address);
+    const validEnsAddress = isValidENSDomainName(address);
+    const validUnsAddress = isValidUnstoppableDomainName(address);
 
-    if (valid || validEnsAddress || address === '') {
+    if (valid || validEnsAddress || validUnsAddress || address === '') {
       this.setState({ error: '', ethAddress: address });
     } else {
       this.setState({ error: INVALID_RECIPIENT_ADDRESS_ERROR });
@@ -79,7 +88,7 @@ export default class AddContact extends PureComponent {
 
   renderInput() {
     return (
-      <EnsInput
+      <DomainInput
         scanQrCode={(_) => {
           this.props.scanQrCode();
         }}
@@ -90,6 +99,7 @@ export default class AddContact extends PureComponent {
         }}
         onReset={() => {
           this.props.resetEnsResolution();
+          this.props.resetUnsResolution();
           this.setState({ ethAddress: '', input: '' });
         }}
         userInput={this.state.input}
@@ -99,9 +109,16 @@ export default class AddContact extends PureComponent {
 
   render() {
     const { t } = this.context;
-    const { history, addToAddressBook, ensError, ensResolution } = this.props;
+    const {
+      history,
+      addToAddressBook,
+      ensError,
+      ensResolution,
+      unsError,
+      unsResolution,
+    } = this.props;
 
-    const errorToRender = ensError || this.state.error;
+    const errorToRender = ensError || unsError || this.state.error;
 
     return (
       <div className="settings-page__content-row address-book__add-contact">
@@ -110,6 +127,14 @@ export default class AddContact extends PureComponent {
             <Identicon address={ensResolution} diameter={60} />
             <div className="address-book__view-contact__group__value">
               {ensResolution}
+            </div>
+          </div>
+        )}
+        {unsResolution && (
+          <div className="address-book__view-contact__group">
+            <Identicon address={unsResolution} diameter={60} />
+            <div className="address-book__view-contact__group__value">
+              {unsResolution}
             </div>
           </div>
         )}
