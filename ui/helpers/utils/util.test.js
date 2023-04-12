@@ -104,8 +104,8 @@ describe('util', () => {
       expect(util.isValidDomainName('bar.')).toStrictEqual(false);
     });
 
-    it('should return false when given a 1-character TLD', () => {
-      expect(util.isValidDomainName('foo.b')).toStrictEqual(false);
+    it('should return true when given a 1-character TLD', () => {
+      expect(util.isValidDomainName('foo.b')).toStrictEqual(true);
     });
   });
 

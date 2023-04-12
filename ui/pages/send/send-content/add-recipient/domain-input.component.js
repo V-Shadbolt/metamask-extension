@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
+import { udTlds } from '@unstoppabledomains/tldsresolverkeys';
 
 import { addHexPrefix } from '../../../../../app/scripts/lib/util';
 import { isValidDomainName } from '../../../../helpers/utils/util';
@@ -34,6 +35,7 @@ export default class DomainInput extends Component {
     onChange: PropTypes.func.isRequired,
     onReset: PropTypes.func.isRequired,
     lookupEnsName: PropTypes.func.isRequired,
+    lookupUnsName: PropTypes.func.isRequired,
     initializeDomainSlice: PropTypes.func.isRequired,
     resetDomainResolution: PropTypes.func.isRequired,
   };
@@ -63,6 +65,7 @@ export default class DomainInput extends Component {
       internalSearch,
       onChange,
       lookupEnsName,
+      lookupUnsName,
       resetDomainResolution,
     } = this.props;
     const input = value.trim();
@@ -71,10 +74,14 @@ export default class DomainInput extends Component {
     if (internalSearch) {
       return null;
     }
-    // Empty ENS state if input is empty
-    // maybe scan ENS
+    // Empty DNS state if input is empty
+    // maybe scan ENS / UNS
     if (isValidDomainName(input)) {
-      lookupEnsName(input);
+      if (udTlds.some(tld => input.toLowerCase().endsWith(tld))) {
+        lookupUnsName(input);
+      } else {
+        lookupEnsName(input);
+      }
     } else {
       resetDomainResolution();
       if (

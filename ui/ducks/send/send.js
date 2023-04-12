@@ -18,6 +18,9 @@ import {
   KNOWN_RECIPIENT_ADDRESS_WARNING,
   NEGATIVE_ETH_ERROR,
   RECIPIENT_TYPES,
+  UNS_CURRENCY_SPEC_ERROR,
+  UNS_CURRENCY_ERROR,
+  UNS_UNKNOWN_ERROR,
 } from '../../pages/send/send.constants';
 
 import {
@@ -81,7 +84,11 @@ import {
   getUnapprovedTxs,
 } from '../metamask/metamask';
 
-import { resetDomainResolution } from '../domains';
+import {
+  resetDomainResolution,
+  swapUdOnTokenChange,
+  domainLookup,
+} from '../domains';
 import {
   isBurnAddress,
   isValidHexAddress,
@@ -2038,6 +2045,65 @@ export function updateSendAsset(
           }`,
         ),
       );
+      /**
+       * Changes the Crypto Address associated with an Unstoppable Domain for Native Tokens
+       * checks to see if an Unstoppable Domain was resolved in the previous screen
+       * if it was, it runs swapUdOnTokenChange to get the address for the swapped currency/token
+       * updates error messaging if necessary
+       * dispatches the new resolved address to the transaction state
+       */
+      if (
+        state.DNS?.domainType === 'UNS' &&
+        state.send.draftTransactions[state.send.currentTransactionUUID]
+          .recipient.address === state.DNS.resolution
+      ) {
+        console.log("here")
+        let unsError = null;
+        const resolution = await swapUdOnTokenChange(
+          state.DNS.domainName,
+          state.metamask.provider?.ticker ?? 'ETH',
+        );
+        if (resolution.error) {
+          if (
+            resolution.error === 'UnspecifiedCurrency' ||
+            resolution.error === 'RecordNotFound'
+          ) {
+            unsError = UNS_CURRENCY_SPEC_ERROR;
+          } else if (resolution.error === 'UnsupportedCurrency') {
+            unsError = UNS_CURRENCY_ERROR;
+          } else {
+            unsError = UNS_UNKNOWN_ERROR;
+          }
+          await dispatch(
+            actions.updateAsset({
+              asset: {
+                type,
+                details: null,
+                balance: account.balance,
+                error: unsError,
+              },
+              initialAssetSet,
+            }),
+          );
+          throw new Error('No address associated with this token');
+        } else {
+          console.log(resolution);
+          dispatch(
+            domainLookup({
+              domainName: resolution.unsName,
+              address: resolution.address,
+              error: resolution.error,
+              domainType: 'UNS',
+            }),
+          );
+          await dispatch(
+            updateRecipient({
+              address: resolution.address,
+              nickname: resolution.unsName,
+            }),
+          );
+        }
+      }
       await dispatch(
         actions.updateAsset({
           asset: {
@@ -2139,6 +2205,52 @@ export function updateSendAsset(
             addHistoryEntry(
               `sendFlow - user set asset to NFT with tokenId ${details.tokenId} and address ${details.address}`,
             ),
+          );
+        }
+      }
+      /**
+       *  Changes the Crypto Address associated with an Unstoppable Domain for Non Native Tokens
+       * checks to see if an Unstoppable Domain was resolved in the previous screen
+       * if it was, it runs swapUdOnTokenChange to get the address for the swapped currency/token
+       * updates error messaging if necessary
+       * dispatches the new resolved address to the transaction state
+       */
+      if (
+        state.DNS?.domainType === 'UNS' &&
+        state.send.draftTransactions[state.send.currentTransactionUUID]
+          .recipient.address === state.DNS.resolution
+      ) {
+        const resolution = await swapUdOnTokenChange(
+          state.DNS.domainName,
+          asset,
+        );
+        if (resolution.error) {
+          if (
+            resolution.error === 'UnspecifiedCurrency' ||
+            resolution.error === 'RecordNotFound'
+          ) {
+            asset.error = UNS_CURRENCY_SPEC_ERROR;
+          } else if (resolution.error === 'UnsupportedCurrency') {
+            asset.error = UNS_CURRENCY_ERROR;
+          } else {
+            asset.error = UNS_UNKNOWN_ERROR;
+          }
+          await dispatch(actions.updateAsset({ asset, initialAssetSet }));
+          throw new Error('No address associated with this token');
+        } else {
+          dispatch(
+            domainLookup({
+              domainName: resolution.unsName,
+              address: resolution.address,
+              error: resolution.error,
+              domainType: 'UNS',
+            }),
+          );
+          await dispatch(
+            updateRecipient({
+              address: resolution.address,
+              nickname: resolution.unsName,
+            }),
           );
         }
       }

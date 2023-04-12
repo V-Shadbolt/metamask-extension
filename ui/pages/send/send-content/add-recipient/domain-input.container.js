@@ -2,6 +2,7 @@ import { debounce } from 'lodash';
 import { connect } from 'react-redux';
 import {
   lookupEnsName,
+  lookupUnsName,
   initializeDomainSlice,
   resetDomainResolution,
 } from '../../../../ducks/domains';
@@ -11,6 +12,10 @@ function mapDispatchToProps(dispatch) {
   return {
     lookupEnsName: debounce(
       (domainName) => dispatch(lookupEnsName(domainName)),
+      150,
+    ),
+    lookupUnsName: debounce(
+      (domainName) => dispatch(lookupUnsName(domainName)),
       150,
     ),
     initializeDomainSlice: () => dispatch(initializeDomainSlice()),
